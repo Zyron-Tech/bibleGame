@@ -152,7 +152,7 @@ function Stages() {
             iconName="search-circle"
             iconColor="#FF8C00"
             buttonColor="#4ECDC4"
-            onPress={() => router.push('/')}
+            onPress={() => router.push('/stage1')}
           />
           <StageCard
             subtitle="Stage 2"

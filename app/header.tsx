@@ -1,10 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons'; // Built-in with Expo
 import { router } from 'expo-router';
+import { useGameStore } from './userStore';
 
-const GameHeader = ({ playerName, coins = 0 }: { playerName: string; coins: number }) => {
-  return (
+
+const GameHeader = ({ coins = 0 }: { coins: number }) => {
+const playerName = useGameStore((state) => state.playerName);
+return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.headerWrapper}>
         
@@ -15,7 +18,7 @@ const GameHeader = ({ playerName, coins = 0 }: { playerName: string; coins: numb
 
         {/* CENTER: Name & Info */}
         <View style={styles.centerInfo}>
-          <Text style={styles.smallWelcome}>Playing as</Text>
+          <Text style={styles.smallWelcome}>Playing as {playerName}</Text>
           <Text style={styles.nameText} numberOfLines={1}>{playerName}</Text>
         </View>
 

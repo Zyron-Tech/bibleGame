@@ -5,9 +5,13 @@ import { Button } from '@react-navigation/elements'
 import { TextInput } from 'react-native-gesture-handler'
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router'
+import { useGameStore } from './userStore'
+
 
 function index() {
   const [name, setName] = useState('');
+  const setGlobalName = useGameStore((state) => state.setPlayerName);
+
 
   const saveName = async () => {
     try {
@@ -18,10 +22,11 @@ function index() {
     }
   };
 
-  const startGame = async () => {
+const startGame = async () => {
     await saveName();
+    setGlobalName(name); // 3. Set it globally before navigating!
     router.push('/stages');
-  }
+  };
 
   const loadName = async () => {
     try {
