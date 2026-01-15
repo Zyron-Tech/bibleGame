@@ -160,7 +160,7 @@ function Stages() {
             iconName="text"
             iconColor="#7209B7"
             buttonColor="#F72585"
-            onPress={() => router.push('/')}
+            onPress={() => router.push('/stage2')}
           />
           <StageCard
             subtitle="Stage 3"
@@ -168,7 +168,7 @@ function Stages() {
             iconName="list"
             iconColor="#2D6A4F"
             buttonColor="#FFD166"
-            onPress={() => router.push('/')}
+            onPress={() => router.push('/stage3')}
           />
           
           {/* Bottom padding for better scrolling */}

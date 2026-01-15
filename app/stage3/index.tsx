@@ -7,7 +7,7 @@ function index() {
     return (
         <SafeAreaView>
             <GameHeader  coins={100}/>
-            <Text>Stage 1 Screen</Text>
+            <Text>Stage 3 Screen</Text>
         </SafeAreaView>
     )
   
