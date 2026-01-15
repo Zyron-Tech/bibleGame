@@ -4,7 +4,6 @@ import { Ionicons } from '@expo/vector-icons'; // Built-in with Expo
 import { router } from 'expo-router';
 import { useGameStore } from './userStore';
 
-
 const GameHeader = ({ coins = 0 }: { coins: number }) => {
 const playerName = useGameStore((state) => state.playerName);
 return (
@@ -25,7 +24,7 @@ return (
         {/* RIGHT: Game Stats (Icons) */}
         <View style={styles.statsRow}>
           <View style={styles.statPill}>
-            <Ionicons name="star" size={18} color="#FFD700" />
+            <Ionicons name="star" size={15} color="#FFD700" />
             <Text style={styles.statValue}>{coins}</Text>
           </View>
           
