@@ -24,7 +24,7 @@ return (
         {/* RIGHT: Game Stats (Icons) */}
         <View style={styles.statsRow}>
           <View style={styles.statPill}>
-            <Ionicons name="star" size={15} color="#FFD700" />
+            <Ionicons name="star" size={18} color="#FFD700" />
             <Text style={styles.statValue}>{coins}</Text>
           </View>
           
