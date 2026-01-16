@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Text, View, Image, ScrollView, Dimensions, StyleSheet, Animated } from 'react-native';
 import { router } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFonts, CherryBombOne_400Regular } from '@expo-google-fonts/cherry-bomb-one';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useGameStore } from '../app/userStore'; // Import the store
 import GameHeader from '../app/header';
 import StageCard from '../app/stagesCard';
 
@@ -14,10 +14,16 @@ const SLIDER_WIDTH = width - (CARD_MARGIN * 2);
 const SLIDER_HEIGHT = height * 0.25;
 
 function Stages() {
-  const [playerName, setPlayerName] = useState('Guest');
   const [activeSlide, setActiveSlide] = useState(0);
   const scrollRef = useRef(null);
   const bounceAnim = useRef(new Animated.Value(0)).current;
+
+  // Load data from store on mount
+  const loadFromStorage = useGameStore((state) => state.loadFromStorage);
+
+  useEffect(() => {
+    loadFromStorage();
+  }, []);
 
   const images = [
     require('../assets/images/slide1.png'),
@@ -63,18 +69,6 @@ function Stages() {
     return () => clearInterval(timer);
   }, [activeSlide]);
 
-  useEffect(() => {
-    const fetchName = async () => {
-      try {
-        const name = await AsyncStorage.getItem('playerName');
-        if (name) setPlayerName(name);
-      } catch (error) {
-        console.log('Error fetching name:', error);
-      }
-    };
-    fetchName();
-  }, []);
-
   const handleScroll = (event) => {
     const slideIndex = Math.round(event.nativeEvent.contentOffset.x / SLIDER_WIDTH);
     if (slideIndex !== activeSlide) {
@@ -90,7 +84,7 @@ function Stages() {
         colors={['#FFF5E6', '#FFE4D6', '#FFFFFF']}
         style={styles.gradientBackground}
       >
-        <GameHeader playerName={playerName} coins={120} />
+        <GameHeader coins={120} />
 
         {/* Enhanced Slider */}
         <View style={styles.sliderContainer}>
@@ -160,7 +154,7 @@ function Stages() {
             iconName="text"
             iconColor="#7209B7"
             buttonColor="#F72585"
-            onPress={() => router.push('/stage2')}
+            onPress={() => router.push('/')}
           />
           <StageCard
             subtitle="Stage 3"
@@ -168,7 +162,7 @@ function Stages() {
             iconName="list"
             iconColor="#2D6A4F"
             buttonColor="#FFD166"
-            onPress={() => router.push('/stage3')}
+            onPress={() => router.push('/')}
           />
           
           {/* Bottom padding for better scrolling */}
