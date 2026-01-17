@@ -6,6 +6,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useGameStore } from '../userStore';
 import GameHeader from '../header';
+import { playSound, speakBookName, speakText, SoundEffect, stopSpeech} from '../audioSystem';
 
 const { width } = Dimensions.get('window');
 
@@ -122,12 +123,20 @@ function Index() {
 
   const handleBookPress = (bookIndex: number) => {
     const bookKey = `${currentLevel}-${bookIndex}`;
+    const book = currentBooks[bookIndex];
     
     if (!revealedBooks[bookKey]) {
       // First press: reveal the book name
       setStage1Progress({
         revealedBooks: { ...revealedBooks, [bookKey]: true }
       });
+      
+      // Play sound effect and speak the book name
+      playSound(SoundEffect.BOOK_REVEAL);
+      setTimeout(() => {
+        speakBookName(book.name, book.number);
+      }, 300); // Small delay after sound effect
+      
     } else {
       // Subsequent presses: bounce the number
       const currentCount = bounceCount[bookKey] || 0;
@@ -137,6 +146,9 @@ function Index() {
         if (!bounceAnims[bookKey]) {
           bounceAnims[bookKey] = new Animated.Value(0);
         }
+
+        // Play bounce sound
+        playSound(SoundEffect.BOUNCE);
 
         // Bounce animation
         Animated.sequence([
@@ -175,8 +187,16 @@ function Index() {
   // Award points every time a level is completed
   useEffect(() => {
     if (isLevelComplete && !currentLevelStatus) {
+      // Play success sound
+      playSound(SoundEffect.LEVEL_COMPLETE);
+      
       // Award points
       addCoins(POINTS_PER_LEVEL);
+      
+      // Play coin sound after a short delay
+      setTimeout(() => {
+        playSound(SoundEffect.COIN_EARNED);
+      }, 500);
       
       // Mark this level as completed (this session)
       setStage1Progress({
@@ -193,6 +213,8 @@ function Index() {
   }, [isLevelComplete, currentLevelStatus]);
 
   const handleNextLevel = () => {
+    playSound(SoundEffect.WHOOSH);
+    
     if (currentLevel < BIBLE_BOOKS.length - 1) {
       const newLevel = currentLevel + 1;
       setStage1Progress({
@@ -201,6 +223,7 @@ function Index() {
       });
     } else {
       // All levels complete!
+      playSound(SoundEffect.SUCCESS);
       Alert.alert(
         '🎉 Congratulations!',
         'You have completed all 66 books of the Bible!',
@@ -208,16 +231,26 @@ function Index() {
           { 
             text: 'Play Again', 
             onPress: () => {
+              playSound(SoundEffect.BUTTON_PRESS);
               resetStage1Progress();
             }
           },
-          { text: 'Exit', onPress: () => router.back() },
+          { 
+            text: 'Exit', 
+            onPress: () => {
+              playSound(SoundEffect.BUTTON_PRESS);
+              stopSpeech(); // Stop any ongoing speech
+              router.back();
+            }
+          },
         ]
       );
     }
   };
 
   const handlePreviousLevel = () => {
+    playSound(SoundEffect.WHOOSH);
+    
     if (currentLevel > 0) {
       const newLevel = currentLevel - 1;
       setStage1Progress({
@@ -228,15 +261,25 @@ function Index() {
   };
 
   const handleReset = () => {
+    playSound(SoundEffect.BUTTON_PRESS);
+    
     Alert.alert(
       'Reset Progress',
       'Are you sure you want to start over? All your progress will be lost (coins will be kept).',
       [
-        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Cancel', 
+          style: 'cancel',
+          onPress: () => playSound(SoundEffect.BUTTON_PRESS)
+        },
         {
           text: 'Reset',
           style: 'destructive',
-          onPress: () => resetStage1Progress()
+          onPress: () => {
+            playSound(SoundEffect.WHOOSH);
+            stopSpeech(); // Stop any ongoing speech
+            resetStage1Progress();
+          }
         },
       ]
     );

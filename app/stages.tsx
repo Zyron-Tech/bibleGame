@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useGameStore } from '../app/userStore'; // Import the store
 import GameHeader from '../app/header';
 import StageCard from '../app/stagesCard';
+import { playSound, SoundEffect } from '../app/audioSystem';
 
 const { width, height } = Dimensions.get('window');
 const CARD_MARGIN = 16;
@@ -146,7 +147,10 @@ function Stages() {
             iconName="search-circle"
             iconColor="#FF8C00"
             buttonColor="#4ECDC4"
-            onPress={() => router.push('/stage1')}
+            onPress={() => {
+              playSound(SoundEffect.BUTTON_PRESS);
+              router.push('/stage1');
+            }}
           />
           <StageCard
             subtitle="Stage 2"
