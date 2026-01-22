@@ -166,7 +166,7 @@ function Stages() {
             iconName="list"
             iconColor="#2D6A4F"
             buttonColor="#FFD166"
-            onPress={() => router.push('/')}
+            onPress={() => router.push('/stage3')}
           />
           
           {/* Bottom padding for better scrolling */}

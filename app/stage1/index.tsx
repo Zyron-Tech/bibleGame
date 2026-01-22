@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Text, View, TouchableOpacity, StyleSheet, Animated, Dimensions, ScrollView, Alert } from 'react-native';
+import { Text, View, TouchableOpacity, StyleSheet, Animated, Dimensions, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -8,7 +8,7 @@ import { useGameStore } from '../userStore';
 import GameHeader from '../header';
 import { playSound, speakBookName, speakText, SoundEffect, stopSpeech} from '../audioSystem';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 // All 66 books of the Bible divided into 6 levels (11 books each)
 const BIBLE_BOOKS = [
@@ -102,8 +102,10 @@ const COLORS = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F'
 const POINTS_PER_LEVEL = 10;
 
 function Index() {
+  const [currentBookIndex, setCurrentBookIndex] = useState(0);
   const [showLevelCompleteModal, setShowLevelCompleteModal] = useState(false);
-  const bounceAnims = useRef({}).current;
+  const bounceAnim = useRef(new Animated.Value(0)).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
 
   // Get state and actions from global store
   const stage1Progress = useGameStore((state) => state.stage1Progress);
@@ -111,22 +113,35 @@ function Index() {
   const resetStage1Progress = useGameStore((state) => state.resetStage1Progress);
   const addCoins = useGameStore((state) => state.addCoins);
   const loadFromStorage = useGameStore((state) => state.loadFromStorage);
-  const resetAllProgress = useGameStore((state) => state.resetAllProgress);
 
   const { currentLevel, revealedBooks, bounceCount, levelCompletionStatus } = stage1Progress;
   const currentBooks = BIBLE_BOOKS[currentLevel];
+  const currentBook = currentBooks[currentBookIndex];
+  const bookKey = `${currentLevel}-${currentBookIndex}`;
+  const isRevealed = revealedBooks[bookKey];
+  const bounces = bounceCount[bookKey] || 0;
 
   // Load progress on mount
   useEffect(() => {
     loadFromStorage();
   }, []);
 
-  const handleBookPress = (bookIndex: number) => {
-    const bookKey = `${currentLevel}-${bookIndex}`;
-    const book = currentBooks[bookIndex];
-    
-    if (!revealedBooks[bookKey]) {
-      // First press: reveal the book name
+  const handleBookPress = () => {
+    if (!isRevealed) {
+      // First press: reveal the book name with scale animation
+      Animated.sequence([
+        Animated.timing(scaleAnim, {
+          toValue: 1.1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scaleAnim, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+      ]).start();
+
       setStage1Progress({
         revealedBooks: { ...revealedBooks, [bookKey]: true }
       });
@@ -134,32 +149,27 @@ function Index() {
       // Play sound effect and speak the book name
       playSound(SoundEffect.BOOK_REVEAL);
       setTimeout(() => {
-        speakBookName(book.name, book.number);
-      }, 300); // Small delay after sound effect
+        speakBookName(currentBook.name, currentBook.number);
+      }, 300);
       
     } else {
       // Subsequent presses: bounce the number
       const currentCount = bounceCount[bookKey] || 0;
       
       if (currentCount < 3) {
-        // Initialize animation if not exists
-        if (!bounceAnims[bookKey]) {
-          bounceAnims[bookKey] = new Animated.Value(0);
-        }
-
         // Play bounce sound
         playSound(SoundEffect.BOUNCE);
 
         // Bounce animation
         Animated.sequence([
-          Animated.timing(bounceAnims[bookKey], {
-            toValue: -15,
-            duration: 150,
+          Animated.timing(bounceAnim, {
+            toValue: -30,
+            duration: 200,
             useNativeDriver: true,
           }),
-          Animated.timing(bounceAnims[bookKey], {
+          Animated.timing(bounceAnim, {
             toValue: 0,
-            duration: 150,
+            duration: 200,
             useNativeDriver: true,
           }),
         ]).start();
@@ -171,10 +181,9 @@ function Index() {
     }
   };
 
-  const getNumberColor = (bookKey: string) => {
-    const count = bounceCount[bookKey] || 0;
+  const getNumberColor = () => {
     const colors = ['#FF6B6B', '#4ECDC4', '#FFA07A', '#98D8C8'];
-    return colors[count % colors.length];
+    return colors[bounces % colors.length];
   };
 
   const progress = Object.keys(revealedBooks).filter(key => 
@@ -187,30 +196,44 @@ function Index() {
   // Award points every time a level is completed
   useEffect(() => {
     if (isLevelComplete && !currentLevelStatus) {
-      // Play success sound
       playSound(SoundEffect.LEVEL_COMPLETE);
-      
-      // Award points
       addCoins(POINTS_PER_LEVEL);
       
-      // Play coin sound after a short delay
       setTimeout(() => {
         playSound(SoundEffect.COIN_EARNED);
       }, 500);
       
-      // Mark this level as completed (this session)
       setStage1Progress({
         levelCompletionStatus: { ...levelCompletionStatus, [currentLevel]: true }
       });
       
       setShowLevelCompleteModal(true);
       
-      // Auto-hide modal after 3 seconds
       setTimeout(() => {
         setShowLevelCompleteModal(false);
       }, 3000);
     }
   }, [isLevelComplete, currentLevelStatus]);
+
+  const handleNextBook = () => {
+    playSound(SoundEffect.WHOOSH);
+    
+    if (currentBookIndex < currentBooks.length - 1) {
+      setCurrentBookIndex(currentBookIndex + 1);
+      bounceAnim.setValue(0);
+      scaleAnim.setValue(1);
+    }
+  };
+
+  const handlePreviousBook = () => {
+    playSound(SoundEffect.WHOOSH);
+    
+    if (currentBookIndex > 0) {
+      setCurrentBookIndex(currentBookIndex - 1);
+      bounceAnim.setValue(0);
+      scaleAnim.setValue(1);
+    }
+  };
 
   const handleNextLevel = () => {
     playSound(SoundEffect.WHOOSH);
@@ -221,8 +244,10 @@ function Index() {
         currentLevel: newLevel,
         levelCompletionStatus: { ...levelCompletionStatus, [newLevel]: false }
       });
+      setCurrentBookIndex(0);
+      bounceAnim.setValue(0);
+      scaleAnim.setValue(1);
     } else {
-      // All levels complete!
       playSound(SoundEffect.SUCCESS);
       Alert.alert(
         '🎉 Congratulations!',
@@ -233,13 +258,14 @@ function Index() {
             onPress: () => {
               playSound(SoundEffect.BUTTON_PRESS);
               resetStage1Progress();
+              setCurrentBookIndex(0);
             }
           },
           { 
             text: 'Exit', 
             onPress: () => {
               playSound(SoundEffect.BUTTON_PRESS);
-              stopSpeech(); // Stop any ongoing speech
+              stopSpeech();
               router.back();
             }
           },
@@ -257,6 +283,9 @@ function Index() {
         currentLevel: newLevel,
         levelCompletionStatus: { ...levelCompletionStatus, [newLevel]: false }
       });
+      setCurrentBookIndex(0);
+      bounceAnim.setValue(0);
+      scaleAnim.setValue(1);
     }
   };
 
@@ -277,8 +306,9 @@ function Index() {
           style: 'destructive',
           onPress: () => {
             playSound(SoundEffect.WHOOSH);
-            stopSpeech(); // Stop any ongoing speech
+            stopSpeech();
             resetStage1Progress();
+            setCurrentBookIndex(0);
           }
         },
       ]
@@ -300,7 +330,7 @@ function Index() {
               <Text style={styles.levelBadgeText}>Level {currentLevel + 1}/6</Text>
             </View>
             <TouchableOpacity onPress={handleReset} style={styles.resetButton}>
-              <Ionicons name="refresh" size={20} color="#FF6B35" />
+              <Ionicons name="refresh" size={24} color="#FF6B35" />
             </TouchableOpacity>
           </View>
           <Text style={styles.levelTitle}>Identify the Books! 📖</Text>
@@ -309,7 +339,7 @@ function Index() {
           </Text>
         </View>
 
-        {/* Progress Bar */}
+        {/* Progress Indicator */}
         <View style={styles.progressContainer}>
           <View style={styles.progressBar}>
             <View 
@@ -323,88 +353,75 @@ function Index() {
             />
           </View>
           <Text style={styles.progressText}>
-            {progress}/{currentBooks.length} Books Revealed
+            Book {currentBookIndex + 1} of {currentBooks.length} • {progress} Revealed
           </Text>
         </View>
 
-        {/* Books Grid */}
-        <ScrollView 
-          style={styles.scrollView}
-          contentContainerStyle={styles.booksContainer}
-          showsVerticalScrollIndicator={false}
-        >
-          {currentBooks.map((book, index) => {
-            const bookKey = `${currentLevel}-${index}`;
-            const isRevealed = revealedBooks[bookKey];
-            const bounces = bounceCount[bookKey] || 0;
-
-            return (
-              <TouchableOpacity
-                key={index}
-                style={styles.bookCard}
-                onPress={() => handleBookPress(index)}
-                activeOpacity={0.8}
+        {/* Big Circle Card */}
+        <View style={styles.cardContainer}>
+          <TouchableOpacity
+            style={styles.circleCard}
+            onPress={handleBookPress}
+            activeOpacity={0.8}
+          >
+            <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+              <LinearGradient
+                colors={
+                  isRevealed 
+                    ? [COLORS[currentLevel], COLORS[(currentLevel + 1) % COLORS.length]] 
+                    : ['#E0E0E0', '#F5F5F5']
+                }
+                style={styles.circleGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
               >
-                <LinearGradient
-                  colors={
-                    isRevealed 
-                      ? [COLORS[currentLevel], COLORS[(currentLevel + 1) % COLORS.length]] 
-                      : ['#E0E0E0', '#F5F5F5']
-                  }
-                  style={styles.bookCardGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                >
-                  {/* Initial or Full Name */}
-                  <View style={styles.bookNameContainer}>
+                {/* Initial or Full Name */}
+                <View style={styles.bookNameContainer}>
+                  <Text style={[
+                    styles.bookText,
+                    !isRevealed && styles.bookInitial
+                  ]}>
+                    {!isRevealed ? currentBook.initial : currentBook.name}
+                  </Text>
+                </View>
+
+                {/* Number Display */}
+                {isRevealed && (
+                  <Animated.View 
+                    style={[
+                      styles.numberBadge,
+                      {
+                        transform: [{ translateY: bounceAnim }]
+                      }
+                    ]}
+                  >
                     <Text style={[
-                      styles.bookInitial,
-                      isRevealed && styles.bookInitialSmall
+                      styles.numberText,
+                      { color: getNumberColor() }
                     ]}>
-                      {!isRevealed ? book.initial : book.name}
+                      {currentBook.number}
                     </Text>
+                  </Animated.View>
+                )}
+
+                {/* Bounce Counter */}
+                {isRevealed && bounces > 0 && (
+                  <View style={styles.bounceCounter}>
+                    {[...Array(3)].map((_, i) => (
+                      <View 
+                        key={i} 
+                        style={[
+                          styles.bounceDot,
+                          i < bounces && styles.bounceDotActive
+                        ]} 
+                      />
+                    ))}
                   </View>
-
-                  {/* Number Display */}
-                  {isRevealed && (
-                    <Animated.View 
-                      style={[
-                        styles.numberBadge,
-                        {
-                          transform: bounceAnims[bookKey] 
-                            ? [{ translateY: bounceAnims[bookKey] }] 
-                            : [{ translateY: 0 }]
-                        }
-                      ]}
-                    >
-                      <Text style={[
-                        styles.numberText,
-                        { color: getNumberColor(bookKey) }
-                      ]}>
-                        {book.number}
-                      </Text>
-                    </Animated.View>
-                  )}
-
-                  {/* Bounce Counter */}
-                  {isRevealed && bounces > 0 && (
-                    <View style={styles.bounceCounter}>
-                      {[...Array(3)].map((_, i) => (
-                        <View 
-                          key={i} 
-                          style={[
-                            styles.bounceDot,
-                            i < bounces && styles.bounceDotActive
-                          ]} 
-                        />
-                      ))}
-                    </View>
-                  )}
-                </LinearGradient>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+                )}
+              </LinearGradient>
+            </Animated.View>
+          </TouchableOpacity>
+        </View>
 
         {/* Level Complete Modal */}
         {showLevelCompleteModal && (
@@ -420,26 +437,48 @@ function Index() {
 
         {/* Navigation Buttons */}
         <View style={styles.navigationContainer}>
-          <TouchableOpacity
-            style={[styles.navButton, currentLevel === 0 && styles.navButtonDisabled]}
-            onPress={handlePreviousLevel}
-            disabled={currentLevel === 0}
-          >
-            <Ionicons name="arrow-back" size={24} color="#fff" />
-            <Text style={styles.navButtonText}>Previous</Text>
-          </TouchableOpacity>
-
-          {isLevelComplete && (
+          {/* Book Navigation */}
+          <View style={styles.bookNavRow}>
             <TouchableOpacity
-              style={[styles.navButton, styles.navButtonNext]}
-              onPress={handleNextLevel}
+              style={[styles.navButton, currentBookIndex === 0 && styles.navButtonDisabled]}
+              onPress={handlePreviousBook}
+              disabled={currentBookIndex === 0}
             >
-              <Text style={styles.navButtonText}>
-                {currentLevel === BIBLE_BOOKS.length - 1 ? 'Finish' : 'Next Level'}
-              </Text>
-              <Ionicons name="arrow-forward" size={24} color="#fff" />
+              <Ionicons name="chevron-back" size={32} color="#fff" />
             </TouchableOpacity>
-          )}
+
+            <TouchableOpacity
+              style={[styles.navButton, currentBookIndex === currentBooks.length - 1 && styles.navButtonDisabled]}
+              onPress={handleNextBook}
+              disabled={currentBookIndex === currentBooks.length - 1}
+            >
+              <Ionicons name="chevron-forward" size={32} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Level Navigation */}
+          <View style={styles.levelNavRow}>
+            <TouchableOpacity
+              style={[styles.levelNavButton, currentLevel === 0 && styles.navButtonDisabled]}
+              onPress={handlePreviousLevel}
+              disabled={currentLevel === 0}
+            >
+              <Ionicons name="arrow-back" size={20} color="#fff" />
+              <Text style={styles.levelNavText}>Previous Level</Text>
+            </TouchableOpacity>
+
+            {isLevelComplete && (
+              <TouchableOpacity
+                style={[styles.levelNavButton, styles.levelNavButtonNext]}
+                onPress={handleNextLevel}
+              >
+                <Text style={styles.levelNavText}>
+                  {currentLevel === BIBLE_BOOKS.length - 1 ? 'Finish' : 'Next Level'}
+                </Text>
+                <Ionicons name="arrow-forward" size={20} color="#fff" />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </LinearGradient>
     </SafeAreaView>
@@ -463,126 +502,124 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
-    gap: 12,
+    gap: 16,
   },
   levelBadge: {
     backgroundColor: '#FF6B35',
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 25,
   },
   levelBadgeText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 'bold',
   },
   resetButton: {
     backgroundColor: '#FFE4D6',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
   },
   levelTitle: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
     color: '#FF6B35',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   levelSubtitle: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
   },
   progressContainer: {
     paddingHorizontal: 20,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   progressBar: {
-    height: 12,
+    height: 14,
     backgroundColor: '#E0E0E0',
     borderRadius: 10,
     overflow: 'hidden',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   progressFill: {
     height: '100%',
     borderRadius: 10,
   },
   progressText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     textAlign: 'center',
     fontWeight: '600',
   },
-  scrollView: {
+  cardContainer: {
     flex: 1,
-  },
-  booksContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 12,
-    paddingBottom: 100,
-  },
-  bookCard: {
-    width: (width - 48) / 3,
-    aspectRatio: 0.8,
-    padding: 4,
-    marginBottom: 8,
-  },
-  bookCardGradient: {
-    flex: 1,
-    borderRadius: 16,
-    padding: 12,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 20,
+  },
+  circleCard: {
+    width: Math.min(width - 80, height * 0.45),
+    height: Math.min(width - 80, height * 0.45),
+  },
+  circleGradient: {
+    width: '100%',
+    height: '100%',
+    borderRadius: Math.min(width - 80, height * 0.45) / 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  bookNameContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bookText: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#fff',
+    textAlign: 'center',
+    paddingHorizontal: 30,
+  },
+  bookInitial: {
+    fontSize: 120,
+    fontWeight: '900',
+  },
+  numberBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'absolute',
+    top: 30,
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
   },
-  bookNameContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  bookInitial: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#fff',
-    textAlign: 'center',
-  },
-  bookInitialSmall: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  numberBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    elevation: 2,
-  },
   numberText: {
-    fontSize: 16,
+    fontSize: 40,
     fontWeight: 'bold',
   },
   bounceCounter: {
     flexDirection: 'row',
     position: 'absolute',
-    bottom: 8,
-    gap: 4,
+    bottom: 30,
+    gap: 8,
   },
   bounceDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
   },
   bounceDotActive: {
@@ -593,30 +630,50 @@ const styles = StyleSheet.create({
     bottom: 20,
     left: 20,
     right: 20,
+  },
+  bookNavRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  levelNavRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   navButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#4ECDC4',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 25,
-    gap: 8,
-    elevation: 4,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 6,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  navButtonNext: {
-    backgroundColor: '#FF6B35',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
   },
   navButtonDisabled: {
     backgroundColor: '#ccc',
   },
-  navButtonText: {
+  levelNavButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4ECDC4',
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 30,
+    gap: 10,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+  },
+  levelNavButtonNext: {
+    backgroundColor: '#FF6B35',
+  },
+  levelNavText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
@@ -634,10 +691,10 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 30,
+    borderRadius: 24,
+    padding: 40,
     alignItems: 'center',
-    minWidth: 250,
+    minWidth: 280,
     elevation: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 5 },
@@ -645,23 +702,23 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
   },
   modalEmoji: {
-    fontSize: 60,
-    marginBottom: 10,
+    fontSize: 80,
+    marginBottom: 16,
   },
   modalTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#FF6B35',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   modalCoins: {
-    fontSize: 32,
+    fontSize: 40,
     fontWeight: 'bold',
     color: '#FFD700',
-    marginBottom: 5,
+    marginBottom: 8,
   },
   modalSubtitle: {
-    fontSize: 16,
+    fontSize: 18,
     color: '#666',
   },
 });
