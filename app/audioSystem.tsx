@@ -1,4 +1,4 @@
-import { Audio } from 'expo-av';
+import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
 import * as Speech from 'expo-speech';
 
 // 1. Sound effect types
@@ -34,27 +34,32 @@ class AudioManager {
   }
 
   async initializeAudio() {
-    try {
-      await Audio.setAudioModeAsync({
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: false,
-        shouldDuckAndroid: true,
-      });
-    } catch (error) {
-      console.error('Error initializing audio:', error);
-    }
+    // A small delay ensures the native bridge is fully initialized
+    setTimeout(async () => {
+      try {
+        await Audio.setAudioModeAsync({
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: true,
+          shouldDuckAndroid: true,
+          // Using hardcoded integers 2 (DuckOthers) to avoid the "invalid value" error
+          interruptionModeAndroid: 2, 
+          interruptionModeIOS: 2,
+        });
+        console.log("Audio System: Initialized successfully with numeric modes.");
+      } catch (error) {
+        console.error('Error initializing audio:', error);
+      }
+    }, 500);
   }
 
-  // --- Helper to convert "1 Kings" to "First Kings" ---
   private formatBookNameForSpeech(name: string): string {
-    // This regex looks for 1, 2, or 3 at the very beginning of the string
     return name
       .replace(/^1\s+/, 'First ')
       .replace(/^2\s+/, 'Second ')
       .replace(/^3\s+/, 'Third ');
   }
 
-  // Play short sound effects
+  // Play short sound effects with auto-unload cleanup
   async playSound(effect: SoundEffect) {
     if (this.isMuted) return;
 
@@ -66,7 +71,7 @@ class AudioManager {
 
       sound.setOnPlaybackStatusUpdate((status) => {
         if (status.isLoaded && status.didJustFinish) {
-          sound.unloadAsync();
+          sound.unloadAsync().catch(() => {}); 
         }
       });
     } catch (error) {
@@ -78,36 +83,42 @@ class AudioManager {
   
   async playBackgroundMusic() {
     try {
-      if (this.backgroundMusic) return;
+      if (this.backgroundMusic) {
+        const status = await this.backgroundMusic.getStatusAsync();
+        if (status.isLoaded && !status.isPlaying && !this.isMuted) {
+          await this.backgroundMusic.playAsync();
+        }
+        return;
+      }
 
       const { sound } = await Audio.Sound.createAsync(
         SOUND_ASSETS['BACKGROUND_MUSIC'],
         { 
-          shouldPlay: true, 
+          shouldPlay: !this.isMuted, 
           isLooping: true, 
           volume: 0.30,
         }
       );
 
       this.backgroundMusic = sound;
-
-      if (this.isMuted) {
-        await this.backgroundMusic.pauseAsync();
-      }
     } catch (error) {
       console.error("Error playing background music:", error);
     }
   }
 
   async stopBackgroundMusic() {
-    if (this.backgroundMusic) {
-      try {
+    if (!this.backgroundMusic) return;
+    
+    try {
+      const status = await this.backgroundMusic.getStatusAsync();
+      if (status.isLoaded) {
         await this.backgroundMusic.stopAsync();
         await this.backgroundMusic.unloadAsync();
-        this.backgroundMusic = null;
-      } catch (error) {
-        console.error("Error stopping music:", error);
       }
+    } catch (error) {
+      console.error("Error stopping music:", error);
+    } finally {
+      this.backgroundMusic = null;
     }
   }
 
@@ -116,7 +127,6 @@ class AudioManager {
   async speakBookName(bookName: string, bookNumber: number) {
     if (!this.isSpeechEnabled) return;
 
-    // Convert "1 Kings" -> "First Kings" before creating the sentence
     const formattedName = this.formatBookNameForSpeech(bookName);
     const text = `This is the book of ${formattedName}. Book number ${bookNumber}.`;
     
@@ -126,8 +136,6 @@ class AudioManager {
         language: 'en-US',
         pitch: 1.7,
         rate: 0.8,
-        onDone: () => console.log('Finished speaking'),
-        onError: (error) => console.error('Speech error:', error),
       });
     } catch (error) {
       console.error('Error speaking:', error);
@@ -161,12 +169,19 @@ class AudioManager {
 
   async setMuted(muted: boolean) {
     this.isMuted = muted;
-    if (this.backgroundMusic) {
-      if (muted) {
-        await this.backgroundMusic.pauseAsync();
-      } else {
-        await this.backgroundMusic.playAsync();
+    if (!this.backgroundMusic) return;
+
+    try {
+      const status = await this.backgroundMusic.getStatusAsync();
+      if (status.isLoaded) {
+        if (muted) {
+          await this.backgroundMusic.pauseAsync();
+        } else {
+          await this.backgroundMusic.playAsync();
+        }
       }
+    } catch (error) {
+      console.warn("Mute toggle failed:", error);
     }
   }
 
@@ -177,29 +192,21 @@ class AudioManager {
     }
   }
 
-  isSoundMuted(): boolean {
-    return this.isMuted;
-  }
-
-  isSpeechActive(): boolean {
-    return this.isSpeechEnabled;
-  }
+  isSoundMuted(): boolean { return this.isMuted; }
+  isSpeechActive(): boolean { return this.isSpeechEnabled; }
 
   async checkSpeechAvailability(): Promise<boolean> {
     try {
-      await Speech.isSpeakingAsync();
-      return true;
-    } catch (error) {
-      console.error('Speech not available:', error);
+      return await Speech.isSpeakingAsync().then(() => true).catch(() => false);
+    } catch {
       return false;
     }
   }
 }
 
-// Create singleton instance
 export const audioManager = new AudioManager();
 
-// Convenience functions
+// Export convenience helpers
 export const playSound = (effect: SoundEffect) => audioManager.playSound(effect);
 export const playBackgroundMusic = () => audioManager.playBackgroundMusic();
 export const stopBackgroundMusic = () => audioManager.stopBackgroundMusic();

@@ -29,8 +29,8 @@ function Stages() {
   const images = [
     require('../assets/images/slide1.png'),
     require('../assets/images/slide2.png'),
-    require('../assets/images/slide1.png'),
-    require('../assets/images/slide1.png'),
+    require('../assets/images/slide3.jpg'),
+    require('../assets/images/slide4.jpg'),
   ];
 
   const [fontsLoaded] = useFonts({

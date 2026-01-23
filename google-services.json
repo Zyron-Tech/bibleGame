@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "258073684670",
+    "project_id": "biblegame-8d871",
+    "storage_bucket": "biblegame-8d871.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:258073684670:android:c7846c1fe83946da970cef",
+        "android_client_info": {
+          "package_name": "com.zyron.biblegame"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAPih0L99XEuh3HYPRw4mOU6T9_BCZTJIc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
