@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "bibleGame",
-    "slug": "bibleGame",
+    "name": "Abba Learners",
+    "slug": "abba-learners",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/splash.png",
@@ -66,8 +66,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "858ebaf4-a7c4-4747-a2b1-48aee9937d8e"
+        "projectId": "25b3b305-26d6-484b-9aa4-d868e4d705f3"
       }
-    }
+    },
+    "owner": "pemses"
   }
 }
